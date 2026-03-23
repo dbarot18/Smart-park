@@ -57,6 +57,29 @@
   align-items: flex-start;
   margin-bottom: 4px;
 }
+.lc-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fav-btn {
+  border: 1px solid var(--border);
+  background: rgba(18, 26, 44, 0.7);
+  color: var(--muted);
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fav-btn.on {
+  color: #ffd55e;
+  border-color: rgba(255, 213, 94, 0.45);
+  background: rgba(255, 213, 94, 0.12);
+}
 .lc-name {
   font-weight: 700;
   font-size: 0.84rem;
@@ -160,6 +183,47 @@
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
   margin: 0 auto 0.8rem;
+}
+
+.quick-cities {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+}
+.city-chip {
+  border: 1px solid var(--border);
+  background: rgba(26, 36, 64, 0.7);
+  color: var(--text);
+  border-radius: var(--r-pill);
+  padding: 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+.city-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.recent-list {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.recent-chip {
+  border: 1px solid var(--border);
+  background: rgba(26, 36, 64, 0.7);
+  color: var(--muted);
+  border-radius: var(--r-pill);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  cursor: pointer;
+}
+.recent-chip:hover {
+  border-color: var(--accent2);
+  color: var(--accent2);
 }
 
 /* ── Booking Modal ── */

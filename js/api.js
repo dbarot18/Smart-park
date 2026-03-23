@@ -87,6 +87,25 @@ const API = (() => {
     throw new Error(`Could not reach Overpass servers. ${reason}`);
   }
 
+  async function fetchStreetParking(lat, lng, radiusM) {
+    const query = _buildStreetParkingQuery(lat, lng, radiusM);
+    const urls = (Array.isArray(CONFIG.OVERPASS_FALLBACK_URLS) && CONFIG.OVERPASS_FALLBACK_URLS.length)
+      ? CONFIG.OVERPASS_FALLBACK_URLS
+      : [CONFIG.OVERPASS_URL];
+
+    let lastError = null;
+    for (const url of urls) {
+      try {
+        const data = await _fetchOverpass(url, query);
+        return data.elements || [];
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    const reason = lastError?.message || 'Unknown network error';
+    throw new Error(`Could not load street parking overlay. ${reason}`);
+  }
+
   async function _fetchOverpass(url, query) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 22000);
@@ -130,6 +149,19 @@ const API = (() => {
     `;
   }
 
+  function _buildStreetParkingQuery(lat, lng, radius) {
+    const around = `(around:${radius},${lat},${lng})`;
+    return `
+      [out:json][timeout:${CONFIG.OVERPASS_TIMEOUT}];
+      (
+        way["parking:lane:left"]${around};
+        way["parking:lane:right"]${around};
+        way["parking:lane:both"]${around};
+      );
+      out center tags;
+    `;
+  }
+
   /* ────────────────────────────────────────────
      PARSE — OSM elements → lot objects (no fake slots)
   ──────────────────────────────────────────── */
@@ -137,6 +169,26 @@ const API = (() => {
   function parseLots(elements, searchLat, searchLng) {
     return elements
       .map((el, i) => _parseElement(el, i, searchLat, searchLng))
+      .filter(Boolean);
+  }
+
+  function parseStreetParking(elements, searchLat, searchLng) {
+    return (elements || [])
+      .map((el, i) => {
+        const lat = el.lat ?? el.center?.lat;
+        const lng = el.lon ?? el.center?.lon;
+        if (lat == null || lng == null) return null;
+        const tags = el.tags || {};
+        const lane = tags['parking:lane:both'] || tags['parking:lane:right'] || tags['parking:lane:left'] || 'street';
+        return {
+          id: `street-${el.type || 'way'}-${el.id || i}`,
+          lat,
+          lng,
+          label: tags.name || `Street parking (${lane})`,
+          lane,
+          dist: Utils.haversine(searchLat, searchLng, lat, lng),
+        };
+      })
       .filter(Boolean);
   }
 
@@ -246,9 +298,9 @@ const API = (() => {
     const rate = Math.max(0.05, baseRate - peakPenalty);
 
     lot.availableSpots = Math.max(0, Math.round(lot.capacity * rate));
-    lot.availabilitySource = 'estimated';
+    lot.availabilitySource = 'simulated';
   }
 
-  return { geocode, fetchParking, parseLots, enrichAvailability };
+  return { geocode, fetchParking, fetchStreetParking, parseLots, parseStreetParking, enrichAvailability };
 
 })();

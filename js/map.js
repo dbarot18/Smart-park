@@ -17,6 +17,7 @@ const MapManager = (() => {
 
   let _map          = null;
   let _markers      = [];
+  let _streetMarkers = [];
   let _radiusCircle = null;
   let _useMapbox    = false;
   let _mapboxToken  = '';
@@ -321,6 +322,37 @@ const MapManager = (() => {
     _markers = [];
   }
 
+  function plotStreetOverlay(items) {
+    clearStreetOverlay();
+    (items || []).forEach(item => {
+      if (_useMapbox) {
+        const el = document.createElement('div');
+        el.className = 'street-pin';
+        el.title = `${item.label} (${item.lane})`;
+        el.textContent = 'S';
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([item.lng, item.lat])
+          .addTo(_map);
+        _streetMarkers.push(marker);
+      } else {
+        const icon = L.divIcon({
+          className: 'street-pin-leaflet',
+          html: '<div class="street-pin">S</div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+        const marker = L.marker([item.lat, item.lng], { icon }).addTo(_map);
+        marker.bindTooltip(`${item.label} (${item.lane})`, { direction: 'top' });
+        _streetMarkers.push(marker);
+      }
+    });
+  }
+
+  function clearStreetOverlay() {
+    _streetMarkers.forEach(m => m.remove());
+    _streetMarkers = [];
+  }
+
   /* ────────────────────────────────────────────
      DIRECTIONS
   ──────────────────────────────────────────── */
@@ -383,6 +415,8 @@ const MapManager = (() => {
     drawRadius,
     plotMarkers,
     clearMarkers,
+    plotStreetOverlay,
+    clearStreetOverlay,
     openDirections,
     isReady,
     usesMapbox,

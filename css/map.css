@@ -203,6 +203,21 @@
   color: #0a0c10;
 }
 
+.street-pin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px dashed #8bb2ff;
+  background: rgba(80, 132, 255, 0.2);
+  color: #bfd3ff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ── Map Detail Panel ── */
 .map-panel {
   position: absolute;
@@ -366,7 +381,7 @@
 
 /* Individual Slot */
 .slt {
-  aspect-ratio: 0.6;
+  aspect-ratio: 0.72;
   border-radius: 5px;
   display: flex;
   align-items: center;
@@ -415,8 +430,35 @@
   cursor: not-allowed;
 }
 
+@media (max-width: 820px) {
+  .slots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+    gap: 6px;
+    max-height: 190px;
+  }
+  .slt {
+    font-size: 0.6rem;
+    border-width: 2px;
+  }
+}
+
 /* Panel Actions */
 .mp-actions {
   display: flex;
   gap: 7px;
+}
+
+@media (max-width: 820px) {
+  .map-panel {
+    position: fixed;
+    left: 0.6rem;
+    right: 0.6rem;
+    width: auto;
+    transform: none;
+    bottom: 0.6rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 14px;
+    z-index: 700;
+  }
 }

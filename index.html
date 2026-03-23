@@ -39,6 +39,7 @@
       />
       <button class="search-btn" id="search-btn">Find Parking</button>
     </div>
+    <button class="geo-btn" id="geo-btn" title="Use my location">📍 Near Me</button>
 
     <div class="header-pills">
       <div class="hpill"><div class="dot live"></div>OSM data</div>
@@ -67,11 +68,28 @@
         <div class="filter-chips" id="filter-chips">
           <button class="fchip on"  data-filter="all">All</button>
           <button class="fchip"     data-filter="available">Available</button>
+          <button class="fchip"     data-filter="favourites">Favourites</button>
           <button class="fchip"     data-filter="free">Free Parking</button>
           <button class="fchip"     data-filter="multistorey">Multi-Storey</button>
           <button class="fchip"     data-filter="underground">Underground</button>
           <button class="fchip"     data-filter="surface">Surface Lot</button>
           <button class="fchip"     data-filter="disabled">♿ Accessible</button>
+        </div>
+
+        <div class="filter-label" style="margin-top:0.75rem;">Map Layers</div>
+        <div class="filter-chips">
+          <button class="fchip" id="street-toggle">Street Parking Overlay</button>
+        </div>
+
+        <div class="stats-strip" id="stats-strip">
+          <div class="ss-item"><span class="ss-k">Total</span><span class="ss-v" id="ss-total">0</span></div>
+          <div class="ss-item"><span class="ss-k">Free Now</span><span class="ss-v" id="ss-free">0</span></div>
+          <div class="ss-item"><span class="ss-k">Fill</span><span class="ss-v" id="ss-fill">0%</span></div>
+        </div>
+
+        <div class="recent-wrap">
+          <div class="filter-label" style="margin-bottom:0.3rem;">Recent Searches</div>
+          <div class="recent-list" id="recent-list"></div>
         </div>
       </div>
 
@@ -100,9 +118,9 @@
         <div class="map-legend-title">OpenStreetMap parking</div>
         <p class="map-legend-hint">Pins show <strong>available spots</strong>: live if your occupancy API is configured, otherwise estimated from capacity/fee.</p>
         <ul class="map-legend-scale">
-          <li><span class="lg-dot" style="background:#00e5a0"></span> 20+ spots</li>
-          <li><span class="lg-dot" style="background:#ffc53d"></span> 6-20 spots</li>
-          <li><span class="lg-dot" style="background:#ff6b6b"></span> 0-5 spots</li>
+          <li><span class="lg-dot" style="background:#00e5a0"></span> Available</li>
+          <li><span class="lg-dot" style="background:#ffc53d"></span> Limited</li>
+          <li><span class="lg-dot" style="background:#ff6b6b"></span> Full</li>
         </ul>
       </div>
 
@@ -131,10 +149,15 @@
           </div>
         </div>
 
-        <p class="mp-disclaimer" id="mp-disclaimer">
-          This app does <strong>not</strong> know real-time occupancy. Always confirm rules, payment, and access on site.
-          Data is community-mapped and may be incomplete or outdated.
-        </p>
+        <p class="mp-disclaimer" id="mp-disclaimer"></p>
+
+        <div class="slot-legend">
+          <div class="sl-item"><span class="sl-box sl-free"></span> Free</div>
+          <div class="sl-item"><span class="sl-box sl-taken"></span> Taken</div>
+          <div class="sl-item"><span class="sl-box sl-reserved"></span> Reserved</div>
+          <div class="sl-item"><span class="sl-box sl-chosen"></span> Selected</div>
+        </div>
+        <div class="slots-grid" id="slots-grid"></div>
 
         <dl class="mp-details" id="mp-details"></dl>
 
@@ -146,6 +169,22 @@
     </div>
 
   </main>
+
+  <div class="modal-bg" id="reserve-modal">
+    <div class="modal">
+      <h2>Reserve Slot</h2>
+      <div class="modal-sub" id="reserve-sub">Confirm your parking reservation.</div>
+      <div class="confirm-box" id="reserve-summary"></div>
+      <div class="fg">
+        <label class="fl" for="plate-input">Vehicle Plate</label>
+        <input class="fi" id="plate-input" type="text" maxlength="15" placeholder="ABC1234" />
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-s" id="reserve-cancel">Cancel</button>
+        <button class="btn btn-p" id="reserve-confirm">Confirm Reservation</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════════════════
        TOAST NOTIFICATION
