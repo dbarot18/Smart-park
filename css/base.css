@@ -1,0 +1,147 @@
+/* ═══════════════════════════════════════════════════════
+   base.css — CSS Variables, Reset, Typography
+═══════════════════════════════════════════════════════ */
+
+/* ── Design Tokens ── */
+:root {
+  /* Colors */
+  --bg:         #070b16;
+  --surface:    #121a2c;
+  --surface2:   #1a2440;
+  --surface3:   #243157;
+  --border:     #31416b;
+  --border2:    #41558a;
+
+  /* Brand */
+  --accent:     #43f5cf;
+  --accent-dim: rgba(67, 245, 207, 0.12);
+  --accent2:    #7f8cff;
+  --accent2-dim:rgba(127, 140, 255, 0.17);
+
+  /* Semantic */
+  --free:       #4dffcf;
+  --occupied:   #ff6b8f;
+  --reserved:   #ffc86a;
+  --unknown:    #90a3cf;
+
+  /* Text */
+  --text:       #edf3ff;
+  --text-dim:   #c8d4f0;
+  --muted:      #9aaad0;
+  --muted2:     #6d7ca5;
+
+  /* Typography */
+  --font-ui:    'Syne', sans-serif;
+  --font-mono:  'Space Mono', monospace;
+
+  /* Spacing */
+  --gap-xs:  4px;
+  --gap-sm:  8px;
+  --gap-md:  12px;
+  --gap-lg:  20px;
+  --gap-xl:  32px;
+
+  /* Radii */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 10px rgba(6, 10, 24, 0.4);
+  --shadow-md: 0 10px 30px rgba(4, 9, 24, 0.58);
+  --shadow-glow: 0 0 20px rgba(67, 245, 207, 0.3);
+
+  /* Transitions */
+  --t-fast:   0.15s ease;
+  --t-normal: 0.22s ease;
+  --t-slow:   0.35s ease;
+
+  /* Header */
+  --header-h: 62px;
+}
+
+/* ── Reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(127,140,255,0.16), transparent 58%),
+    radial-gradient(1000px 560px at 95% 0%, rgba(67,245,207,0.15), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input, select {
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+img { display: block; max-width: 100%; }
+
+/* ── Grid Background ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(127, 140, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(67, 245, 207, 0.028) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+
+/* ── Selection ── */
+::selection {
+  background: rgba(0, 229, 160, 0.2);
+  color: var(--text);
+}
+
+/* ── Utility Classes ── */
+.mono { font-family: var(--font-mono); }
+.accent { color: var(--accent); }
+.muted  { color: var(--muted); }
+.hidden { display: none !important; }
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}

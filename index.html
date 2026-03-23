@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ParkSmart USA — OpenStreetMap Parking</title>
+  <meta name="description" content="Find mapped parking in the USA from OpenStreetMap — real locations and tags, no fake live occupancy." />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/map.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════ -->
+  <header id="app-header">
+    <div class="logo">
+      <div class="logo-icon">🅿</div>
+      Park<em>Smart</em>
+      <span class="logo-usa">USA</span>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon-left">⌕</span>
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search any US city, address or landmark…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="search-btn" id="search-btn">Find Parking</button>
+    </div>
+
+    <div class="header-pills">
+      <div class="hpill"><div class="dot live"></div>OSM data</div>
+      <div class="hpill"><div class="dot free"></div><span id="hdr-lots">—</span>&nbsp;Lots</div>
+      <div class="hpill"><div class="dot occ"></div><span id="hdr-cap-tagged">—</span>&nbsp;Spots found</div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       MAIN LAYOUT
+  ══════════════════════════════════════════ -->
+  <main id="app-main">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-top">
+        <div class="filter-label">Search Radius</div>
+        <div class="radius-row">
+          <label>Distance:</label>
+          <input type="range" id="radius-slider" min="200" max="5000" step="100" value="1000" />
+          <span class="radius-val" id="radius-label">1.0 km</span>
+        </div>
+
+        <div class="filter-label">Filter by Type</div>
+        <div class="filter-chips" id="filter-chips">
+          <button class="fchip on"  data-filter="all">All</button>
+          <button class="fchip"     data-filter="available">Available</button>
+          <button class="fchip"     data-filter="free">Free Parking</button>
+          <button class="fchip"     data-filter="multistorey">Multi-Storey</button>
+          <button class="fchip"     data-filter="underground">Underground</button>
+          <button class="fchip"     data-filter="surface">Surface Lot</button>
+          <button class="fchip"     data-filter="disabled">♿ Accessible</button>
+        </div>
+      </div>
+
+      <div class="list-header">
+        <div class="list-header-left">
+          <span class="dot free" style="display:inline-block;margin-right:5px"></span>
+          LOTS (<span id="result-count">0</span>)
+        </div>
+        <div class="list-header-right" id="refresh-btn">↻ Refresh</div>
+      </div>
+
+      <div class="lot-list" id="lot-list">
+        <div class="state-box">
+          <span class="icon">🗺️</span>
+          Search for a US place — mapped parking from OpenStreetMap
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAP -->
+    <div class="map-wrap" id="map-wrap">
+      <div id="gmap"></div>
+
+      <!-- Map legend (availability + markers) -->
+      <div class="map-legend" id="map-legend" aria-label="Map legend">
+        <div class="map-legend-title">OpenStreetMap parking</div>
+        <p class="map-legend-hint">Pins show <strong>available spots</strong>: live if your occupancy API is configured, otherwise estimated from capacity/fee.</p>
+        <ul class="map-legend-scale">
+          <li><span class="lg-dot" style="background:#00e5a0"></span> 20+ spots</li>
+          <li><span class="lg-dot" style="background:#ffc53d"></span> 6-20 spots</li>
+          <li><span class="lg-dot" style="background:#ff6b6b"></span> 0-5 spots</li>
+        </ul>
+      </div>
+
+      <!-- Detail Panel -->
+      <div class="map-panel" id="map-panel">
+        <div class="mp-head">
+          <div>
+            <div class="mp-title" id="mp-title">—</div>
+            <div class="mp-sub"   id="mp-sub">—</div>
+          </div>
+          <button class="mp-close" id="mp-close">✕</button>
+        </div>
+
+        <div class="mp-grid">
+          <div class="mp-stat">
+            <div class="mp-stat-val" id="mp-capacity">—</div>
+            <div class="mp-stat-label">Available spots</div>
+          </div>
+          <div class="mp-stat">
+            <div class="mp-stat-val" id="mp-fee">—</div>
+            <div class="mp-stat-label">Fee (tag)</div>
+          </div>
+          <div class="mp-stat">
+            <div class="mp-stat-val" id="mp-type">—</div>
+            <div class="mp-stat-label">Type</div>
+          </div>
+        </div>
+
+        <p class="mp-disclaimer" id="mp-disclaimer">
+          This app does <strong>not</strong> know real-time occupancy. Always confirm rules, payment, and access on site.
+          Data is community-mapped and may be incomplete or outdated.
+        </p>
+
+        <dl class="mp-details" id="mp-details"></dl>
+
+        <div class="mp-actions">
+          <button class="btn btn-dir" id="dir-btn">🧭 Directions</button>
+          <button class="btn btn-s" id="osm-btn">🗺️ OpenStreetMap</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══════════════════════════════════════════
+       TOAST NOTIFICATION
+  ══════════════════════════════════════════ -->
+  <div class="toast" id="toast">
+    <div class="toast-t" id="toast-t"></div>
+    <div class="toast-b" id="toast-b"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCRIPTS
+  ══════════════════════════════════════════ -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,269 @@
+/* ═══════════════════════════════════════════════════════
+   components.css — Cards, Chips, Buttons, Modal, Toast
+═══════════════════════════════════════════════════════ */
+
+/* ── Filter Chips ── */
+.fchip {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.fchip.on,
+.fchip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ── Lot Card ── */
+.lot-card {
+  background: linear-gradient(150deg, rgba(26, 36, 64, 0.9), rgba(28, 42, 72, 0.8));
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  position: relative;
+  overflow: hidden;
+}
+.lot-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  background: var(--border);
+  transition: background var(--t-fast);
+}
+.lot-card:hover,
+.lot-card.active {
+  border-color: var(--accent);
+  transform: translateX(3px);
+  box-shadow: 0 8px 18px rgba(67, 245, 207, 0.12);
+}
+.lot-card:hover::before,
+.lot-card.active::before { background: var(--accent); }
+
+.lc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.lc-name {
+  font-weight: 700;
+  font-size: 0.84rem;
+  line-height: 1.25;
+  padding-right: 6px;
+}
+.lc-badge {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.b-free  { background: rgba(0,229,160,0.12); color: var(--free);     border: 1px solid rgba(0,229,160,0.25); }
+.b-paid  { background: rgba(255,159,0,0.12); color: var(--reserved); border: 1px solid rgba(255,159,0,0.25); }
+.b-unkn  { background: rgba(107,122,153,0.1); color: var(--muted);   border: 1px solid rgba(107,122,153,0.2); }
+
+.lc-addr {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.lc-meta {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lc-meta span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.lc-tag-src {
+  font-size: 0.55rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.avail-bar {
+  margin-top: 6px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.avail-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ── Buttons ── */
+.btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--r-md);
+  border: none;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.btn-p   { background: var(--accent); color: #0a0c10; }
+.btn-p:hover { background: #67ffd9; box-shadow: 0 0 16px rgba(67,245,207,0.35); }
+.btn-s   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-s:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-dir { background: var(--accent2-dim); color: #bac2ff; border: 1px solid rgba(127,140,255,0.35); }
+.btn-dir:hover { background: rgba(127,140,255,0.26); }
+
+/* ── State Boxes (empty / loading) ── */
+.state-box {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.8;
+  background: rgba(18, 26, 44, 0.45);
+  border: 1px solid rgba(65, 85, 138, 0.3);
+  border-radius: var(--r-md);
+}
+.state-box .icon {
+  font-size: 2.2rem;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  margin: 0 auto 0.8rem;
+}
+
+/* ── Booking Modal ── */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.modal-bg.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 1.8rem;
+  width: min(420px, 92vw);
+  animation: popIn var(--t-normal) ease;
+}
+.modal h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 0.2rem;
+}
+.modal-sub {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+.confirm-box {
+  background: rgba(0, 229, 160, 0.05);
+  border: 1px solid rgba(0, 229, 160, 0.16);
+  border-radius: var(--r-md);
+  padding: 10px;
+  margin-bottom: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+}
+.cr {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+.cl { color: var(--muted); }
+.cv { color: var(--accent); font-weight: 700; }
+
+.fg { margin-bottom: 0.75rem; }
+.fl {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.fi {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 0.87rem;
+  outline: none;
+  transition: border-color var(--t-fast);
+}
+.fi:focus { border-color: var(--accent); }
+
+.modal-btns {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--surface2);
+  border-radius: var(--r-lg);
+  padding: 12px 16px;
+  z-index: 600;
+  display: none;
+  max-width: 300px;
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-md);
+  animation: toastIn var(--t-normal) ease;
+}
+.toast.err  { border-left-color: var(--occupied); }
+.toast.show { display: block; }
+.toast-t {
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 2px;
+}
+.toast-b {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
