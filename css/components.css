@@ -95,7 +95,7 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-.b-free  { background: rgba(0,229,160,0.12); color: var(--free);     border: 1px solid rgba(0,229,160,0.25); }
+.b-free  { background: rgba(57,216,255,0.14); color: var(--free);     border: 1px solid rgba(57,216,255,0.35); }
 .b-paid  { background: rgba(255,159,0,0.12); color: var(--reserved); border: 1px solid rgba(255,159,0,0.25); }
 .b-unkn  { background: rgba(107,122,153,0.1); color: var(--muted);   border: 1px solid rgba(107,122,153,0.2); }
 
@@ -153,7 +153,7 @@
   transition: all var(--t-fast);
 }
 .btn-p   { background: var(--accent); color: #0a0c10; }
-.btn-p:hover { background: #67ffd9; box-shadow: 0 0 16px rgba(67,245,207,0.35); }
+.btn-p:hover { background: #7bd2f2; box-shadow: 0 0 18px rgba(101,188,219,0.35); }
 .btn-s   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .btn-s:hover { border-color: var(--accent2); color: var(--accent2); }
 .btn-dir { background: var(--accent2-dim); color: #bac2ff; border: 1px solid rgba(127,140,255,0.35); }

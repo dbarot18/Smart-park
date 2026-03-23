@@ -28,6 +28,7 @@ const App = (() => {
   function init() {
     _loadPersistedState();
     _bindEvents();
+    document.addEventListener('ps:booked', _onExternalBooked);
     UI.showWelcome();
     UI.renderRecentSearches(state.recentSearches, _searchByText);
     _bootMap();
@@ -193,6 +194,9 @@ const App = (() => {
       onToggleFavourite: () => _onToggleFavourite(lot.id),
       selectedSlotId: state.selectedSlotId,
     });
+    if (typeof SlotReservation !== 'undefined' && SlotReservation.init) {
+      SlotReservation.init(lot);
+    }
     if (window.innerWidth <= 820) {
       document.getElementById('map-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -363,6 +367,9 @@ const App = (() => {
             onToggleFavourite: () => _onToggleFavourite(lot.id),
             selectedSlotId: state.selectedSlotId,
           });
+          if (typeof SlotReservation !== 'undefined' && SlotReservation.refresh) {
+            SlotReservation.refresh();
+          }
         }
       }
       _refreshView();
@@ -459,6 +466,28 @@ const App = (() => {
       recentSearches: state.recentSearches,
       notifyWatches: state.notifyWatches,
     }));
+  }
+
+  function _onExternalBooked(e) {
+    const detail = e?.detail;
+    if (!detail) return;
+    const lot = state.lots.find(l => String(l.id) === String(detail.lotId));
+    if (!lot) return;
+    const slot = lot.slots?.find(s => String(s.id) === String(detail.slotId));
+    if (slot) slot.status = 'booked';
+    const key = `${lot.id}:${detail.slotId}`;
+    state.bookings[key] = {
+      plate: detail.plate,
+      name: detail.name || '',
+      duration: detail.duration || 2,
+      ref: detail.ref || '',
+      ts: Date.now(),
+    };
+    if (Number.isFinite(lot.availableSpots)) {
+      lot.availableSpots = Math.max(0, lot.availableSpots - 1);
+    }
+    UI.toast('Reservation confirmed', `${lot.name} · Slot ${detail.slotId} · ${detail.plate}`, false);
+    _refreshView();
   }
 
   async function _openDirectionsToLot(lot, navWindow) {

@@ -151,6 +151,11 @@
 
         <p class="mp-disclaimer" id="mp-disclaimer"></p>
 
+        <div class="slot-section">
+          <div class="slot-section-title">
+            PARKING SLOTS
+            <div class="slot-live-badge"><div class="slot-live-dot"></div> Live</div>
+          </div>
         <div class="slot-legend">
           <div class="sl-item"><span class="sl-box sl-free"></span> Free</div>
           <div class="sl-item"><span class="sl-box sl-taken"></span> Taken</div>
@@ -158,6 +163,15 @@
           <div class="sl-item"><span class="sl-box sl-chosen"></span> Selected</div>
         </div>
         <div class="slots-grid" id="slots-grid"></div>
+          <div class="slot-actions">
+            <button class="ps-btn ps-btn-auto" id="btn-auto-pick">🎯 Auto-Pick Best</button>
+            <button class="ps-btn ps-btn-reserve" id="btn-reserve" disabled>Reserve Slot →</button>
+          </div>
+        </div>
+        <div class="ps-booking-card" id="booking-card">
+          <div class="ps-booking-card-title">✅ Slot Reserved!</div>
+          <div class="ps-booking-ref" id="booking-ref"></div>
+        </div>
 
         <dl class="mp-details" id="mp-details"></dl>
 
@@ -186,6 +200,43 @@
     </div>
   </div>
 
+  <div class="ps-modal-overlay" id="ps-modal-overlay">
+    <div class="ps-modal">
+      <button class="ps-modal-close" id="ps-modal-close">✕</button>
+      <h2>Reserve Parking Slot</h2>
+      <div class="ps-modal-sub" id="ps-modal-sub">—</div>
+      <div class="ps-confirm-box" id="ps-confirm-box"></div>
+      <div class="ps-form-group">
+        <label class="ps-form-label">Vehicle Plate Number *</label>
+        <input class="ps-form-input" id="ps-plate" placeholder="e.g. ABC-1234" maxlength="12" />
+      </div>
+      <div class="ps-form-group">
+        <label class="ps-form-label">Driver Name</label>
+        <input class="ps-form-input" id="ps-name" placeholder="e.g. John Smith" maxlength="40" />
+      </div>
+      <div class="ps-form-group">
+        <label class="ps-form-label">Duration (hours)</label>
+        <input class="ps-form-input" id="ps-duration" type="number" min="1" max="24" value="2" />
+        <div class="ps-duration-chips" id="ps-dur-chips">
+          <button class="ps-dur-chip" data-h="1">1h</button>
+          <button class="ps-dur-chip on" data-h="2">2h</button>
+          <button class="ps-dur-chip" data-h="4">4h</button>
+          <button class="ps-dur-chip" data-h="8">8h</button>
+          <button class="ps-dur-chip" data-h="24">Full Day</button>
+        </div>
+      </div>
+      <div class="ps-modal-btns">
+        <button class="ps-btn ps-btn-auto" id="ps-cancel-btn">Cancel</button>
+        <button class="ps-btn ps-btn-reserve" id="ps-confirm-btn">✓ Confirm Booking</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ps-toast" id="ps-toast">
+    <div class="ps-toast-title" id="ps-toast-title"></div>
+    <div class="ps-toast-body" id="ps-toast-body"></div>
+  </div>
+
   <!-- ══════════════════════════════════════════
        TOAST NOTIFICATION
   ══════════════════════════════════════════ -->
@@ -202,6 +253,7 @@
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/slot-reservation.js"></script>
   <script src="js/app.js"></script>
 
 </body>

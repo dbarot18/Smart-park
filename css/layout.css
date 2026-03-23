@@ -68,7 +68,7 @@
 }
 .search-wrap input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.08);
+  box-shadow: 0 0 0 3px rgba(101, 188, 219, 0.20);
 }
 .search-wrap input::placeholder { color: var(--muted); }
 .search-icon-left {
@@ -91,8 +91,8 @@
   padding: 6px 14px;
   transition: background var(--t-fast);
 }
-.search-btn:hover { background: #00ffb3; }
-.search-btn:hover { box-shadow: 0 8px 16px rgba(67, 245, 207, 0.25); }
+.search-btn:hover { background: #7bd2f2; }
+.search-btn:hover { box-shadow: 0 8px 16px rgba(101, 188, 219, 0.32); }
 
 .geo-btn {
   border: 1px solid var(--border);
@@ -145,10 +145,11 @@
   flex: 1;
   display: grid;
   grid-template-columns: 370px 1fr;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 1;
-  height: calc(100vh - var(--header-h));
+  min-height: calc(100vh - var(--header-h));
+  height: auto;
 }
 
 /* ── Sidebar ── */
@@ -270,7 +271,8 @@
 /* ── Map Wrapper ── */
 .map-wrap {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  min-height: calc(100vh - var(--header-h));
   background: radial-gradient(800px 420px at 70% -20%, rgba(127, 140, 255, 0.2), transparent 60%), #0d1222;
 }
 
