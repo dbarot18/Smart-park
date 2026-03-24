@@ -67,13 +67,14 @@ const Utils = (() => {
    * Marker colour from availability if present, else fee tag.
    */
   function lotMarkerColor(lot) {
-    if (Number.isFinite(lot.availableSpots)) {
+    if (
+      (lot.availabilitySource === 'live' || lot.availabilitySource === 'demo')
+      && Number.isFinite(lot.availableSpots)
+    ) {
       if (lot.availableSpots > 20) return '#00e5a0';
       if (lot.availableSpots > 5)  return '#ffc53d';
       return '#ff6b6b';
     }
-    if (lot.fee === 'no')  return '#00e5a0';
-    if (lot.fee === 'yes') return '#ffc53d';
     return '#6b7a99';
   }
 

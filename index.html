@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ParkSmart USA — OpenStreetMap Parking</title>
-  <meta name="description" content="Find mapped parking in the USA from OpenStreetMap — real locations and tags, no fake live occupancy." />
+  <meta name="description" content="Find mapped parking in the USA from OpenStreetMap — real locations and tags. Live bay counts only with your own occupancy API." />
 
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
@@ -44,7 +44,7 @@
     <div class="header-pills">
       <div class="hpill"><div class="dot live"></div>OSM data</div>
       <div class="hpill"><div class="dot free"></div><span id="hdr-lots">—</span>&nbsp;Lots</div>
-      <div class="hpill"><div class="dot occ"></div><span id="hdr-cap-tagged">—</span>&nbsp;Spots found</div>
+      <div class="hpill"><div class="dot occ"></div><span id="hdr-cap-tagged">—</span>&nbsp;OSM capacity</div>
     </div>
   </header>
 
@@ -67,7 +67,7 @@
         <div class="filter-label">Filter by Type</div>
         <div class="filter-chips" id="filter-chips">
           <button class="fchip on"  data-filter="all">All</button>
-          <button class="fchip"     data-filter="available">Available</button>
+          <button class="fchip"     data-filter="available" title="Lots with live free count from your API">Live free</button>
           <button class="fchip"     data-filter="favourites">Favourites</button>
           <button class="fchip"     data-filter="free">Free Parking</button>
           <button class="fchip"     data-filter="multistorey">Multi-Storey</button>
@@ -116,11 +116,12 @@
       <!-- Map legend (availability + markers) -->
       <div class="map-legend" id="map-legend" aria-label="Map legend">
         <div class="map-legend-title">OpenStreetMap parking</div>
-        <p class="map-legend-hint">Pins show <strong>available spots</strong>: live if your occupancy API is configured, otherwise estimated from capacity/fee.</p>
+        <p class="map-legend-hint">Pins use <strong>live free counts</strong> only when <code>OCCUPANCY_API_URL</code> is set. Otherwise pins are neutral — OSM does not include live occupancy.</p>
         <ul class="map-legend-scale">
           <li><span class="lg-dot" style="background:#00e5a0"></span> Available</li>
           <li><span class="lg-dot" style="background:#ffc53d"></span> Limited</li>
           <li><span class="lg-dot" style="background:#ff6b6b"></span> Full</li>
+          <li><span class="lg-dot" style="background:#6b7a99"></span> No live count</li>
         </ul>
       </div>
 
@@ -137,7 +138,7 @@
         <div class="mp-grid">
           <div class="mp-stat">
             <div class="mp-stat-val" id="mp-capacity">—</div>
-            <div class="mp-stat-label">Available spots</div>
+            <div class="mp-stat-label" id="mp-capacity-label">Free bays (live API)</div>
           </div>
           <div class="mp-stat">
             <div class="mp-stat-val" id="mp-fee">—</div>
@@ -151,17 +152,19 @@
 
         <p class="mp-disclaimer" id="mp-disclaimer"></p>
 
-        <div class="slot-section">
+        <div class="slot-section" id="slot-section">
           <div class="slot-section-title">
             PARKING SLOTS
-            <div class="slot-live-badge"><div class="slot-live-dot"></div> Live</div>
+            <div class="slot-live-badge" id="slot-source-badge"><div class="slot-live-dot"></div><span id="slot-source-label">OSM only</span></div>
           </div>
         <div class="slot-legend">
           <div class="sl-item"><span class="sl-box sl-free"></span> Free</div>
           <div class="sl-item"><span class="sl-box sl-taken"></span> Taken</div>
           <div class="sl-item"><span class="sl-box sl-reserved"></span> Reserved</div>
           <div class="sl-item"><span class="sl-box sl-chosen"></span> Selected</div>
+          <div class="sl-item"><span class="sl-box sl-unknown"></span> Unknown</div>
         </div>
+        <p class="slot-soon-hint">⏱ On taken or reserved slots, an estimate means the bay may open in about 20–25 min — tap the slot or hover for details.</p>
         <div class="slots-grid" id="slots-grid"></div>
           <div class="slot-actions">
             <button class="ps-btn ps-btn-auto" id="btn-auto-pick">🎯 Auto-Pick Best</button>
@@ -171,6 +174,7 @@
         <div class="ps-booking-card" id="booking-card">
           <div class="ps-booking-card-title">✅ Slot Reserved!</div>
           <div class="ps-booking-ref" id="booking-ref"></div>
+          <button type="button" class="ps-btn-cancel-booking" id="btn-cancel-booking">Cancel booking</button>
         </div>
 
         <dl class="mp-details" id="mp-details"></dl>
@@ -224,6 +228,17 @@
           <button class="ps-dur-chip" data-h="8">8h</button>
           <button class="ps-dur-chip" data-h="24">Full Day</button>
         </div>
+      </div>
+      <div class="ps-form-group ps-payment-wrap" id="ps-payment-wrap" hidden>
+        <label class="ps-form-label" for="ps-payment-method">Payment method *</label>
+        <select class="ps-form-input" id="ps-payment-method">
+          <option value="">Choose…</option>
+          <option value="card">Credit / debit card</option>
+          <option value="apple">Apple Pay</option>
+          <option value="google">Google Pay</option>
+          <option value="mobile">Pay at kiosk or parking app</option>
+        </select>
+        <p class="ps-payment-hint">This demo does not charge a real payment.</p>
       </div>
       <div class="ps-modal-btns">
         <button class="ps-btn ps-btn-auto" id="ps-cancel-btn">Cancel</button>

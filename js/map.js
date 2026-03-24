@@ -18,11 +18,46 @@ const MapManager = (() => {
   let _map          = null;
   let _markers      = [];
   let _streetMarkers = [];
+  let _userMarker   = null;
   let _radiusCircle = null;
   let _useMapbox    = false;
   let _mapboxToken  = '';
   let _onDirectionsAskCb = null;
   let _popupDelegationBound = false;
+  let _resizeListenersBound = false;
+
+  /**
+   * Leaflet/Mapbox need the map container’s final size. If init runs before layout
+   * (common with CSS grid/flex), tiles stay blank and markers pile at the center.
+   */
+  function resizeMap() {
+    if (!_map) return;
+    try {
+      if (_useMapbox) {
+        _map.resize();
+      } else {
+        _map.invalidateSize(true);
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  function scheduleMapResize() {
+    resizeMap();
+    requestAnimationFrame(() => resizeMap());
+    setTimeout(() => resizeMap(), 120);
+    setTimeout(() => resizeMap(), 300);
+    setTimeout(() => resizeMap(), 450);
+  }
+
+  function bindMapResizeListeners() {
+    if (_resizeListenersBound) return;
+    _resizeListenersBound = true;
+    window.addEventListener('resize', Utils.debounce(() => resizeMap(), 120));
+    window.addEventListener('orientationchange', () => setTimeout(scheduleMapResize, 350));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') scheduleMapResize();
+    });
+  }
 
   /* ────────────────────────────────────────────
      INIT
@@ -49,6 +84,8 @@ const MapManager = (() => {
         if (onError) onError();
       });
       _map.on('load', () => {
+        bindMapResizeListeners();
+        scheduleMapResize();
         if (onReady) onReady();
       });
     };
@@ -86,15 +123,21 @@ const MapManager = (() => {
     const script   = document.createElement('script');
     script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
     script.onload  = () => {
-      _map = L.map('gmap', { zoomControl: true })
-               .setView([CONFIG.USA_CENTER.lat, CONFIG.USA_CENTER.lng], CONFIG.USA_ZOOM);
+      _map = L.map('gmap', {
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([CONFIG.USA_CENTER.lat, CONFIG.USA_CENTER.lng], CONFIG.USA_ZOOM);
 
       L.tileLayer(CONFIG.LEAFLET_TILE, {
-        attribution: CONFIG.LEAFLET_ATTR,
+        attribution: '',
         maxZoom:     19,
       }).addTo(_map);
 
-      if (onReady) onReady();
+      _map.whenReady(() => {
+        bindMapResizeListeners();
+        scheduleMapResize();
+        if (onReady) onReady();
+      });
     };
     document.head.appendChild(script);
   }
@@ -204,12 +247,10 @@ const MapManager = (() => {
 
   function _markerHtml(lot, color) {
     const knownAvail = Number.isFinite(lot.availableSpots);
-    const badge = knownAvail
-      ? `${lot.availabilitySource === 'estimated' ? '~' : ''}${lot.availableSpots}`
-      : '?';
+    const badge = knownAvail ? String(lot.availableSpots) : '?';
     const capHint = knownAvail
-      ? `${lot.availableSpots} spots available (${lot.availabilitySource})`
-      : 'Availability unknown';
+      ? `${lot.availableSpots} free (${lot.availabilitySource})`
+      : 'No availability estimate';
     const feeLine = lot.fee === 'yes'
       ? 'Paid parking'
       : lot.fee === 'no'
@@ -224,7 +265,7 @@ const MapManager = (() => {
           <span class="ps-marker-p">P</span>
         </div>
         <span class="ps-marker-badge">${badge}</span>
-        <span class="ps-marker-sub">avail</span>
+        <span class="ps-marker-sub">${knownAvail ? 'avail' : '—'}</span>
         <div class="ps-hover-pop" role="dialog" aria-label="Parking action">
           <div class="ps-pop-line ps-pop-title">${safeName}</div>
           <div class="ps-pop-line">${_escapeAttr(feeLine)}</div>
@@ -353,6 +394,36 @@ const MapManager = (() => {
     _streetMarkers = [];
   }
 
+  function setUserLocationMarker(lat, lng) {
+    clearUserLocationMarker();
+    if (!_map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    if (_useMapbox) {
+      const el = document.createElement('div');
+      el.className = 'ps-user-marker';
+      el.innerHTML = '<span class="ps-user-pin">📍</span>';
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(_map);
+      _userMarker = marker;
+      return;
+    }
+
+    const icon = L.divIcon({
+      className: 'ps-user-marker-leaflet',
+      html: '<div class="ps-user-marker"><span class="ps-user-pin">📍</span></div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 24],
+    });
+    _userMarker = L.marker([lat, lng], { icon }).addTo(_map);
+  }
+
+  function clearUserLocationMarker() {
+    if (!_userMarker) return;
+    _userMarker.remove();
+    _userMarker = null;
+  }
+
   /* ────────────────────────────────────────────
      DIRECTIONS
   ──────────────────────────────────────────── */
@@ -417,9 +488,13 @@ const MapManager = (() => {
     clearMarkers,
     plotStreetOverlay,
     clearStreetOverlay,
+    setUserLocationMarker,
+    clearUserLocationMarker,
     openDirections,
     isReady,
     usesMapbox,
+    resizeMap,
+    scheduleMapResize,
   };
 
 })();

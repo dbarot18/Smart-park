@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
    app.js — Main Application Controller
-   Data: real OSM features only (no simulated slot occupancy).
+   OSM lots + demo slot grid; live API overrides counts when OCCUPANCY_API_URL is set.
 ═══════════════════════════════════════════════════════ */
 
 'use strict';
@@ -11,7 +11,6 @@ const App = (() => {
     lots:        [],
     center:      null,
     selectedLot: null,
-    selectedSlotId: null,
     radius:      CONFIG.DEFAULT_RADIUS,
     filterType:  'all',
     mapboxToken: '',
@@ -29,10 +28,11 @@ const App = (() => {
     _loadPersistedState();
     _bindEvents();
     document.addEventListener('ps:booked', _onExternalBooked);
+    document.addEventListener('ps:cancelled', _onBookingCancelled);
     UI.showWelcome();
     UI.renderRecentSearches(state.recentSearches, _searchByText);
     _bootMap();
-    _startLiveSimulation();
+    _clearLiveSimulation();
   }
 
   function _bootMap() {
@@ -125,7 +125,6 @@ const App = (() => {
       _applyFavouriteFlags();
       await API.enrichAvailability(state.lots);
       state.lots.forEach(_prepareLotSlots);
-      state.selectedSlotId = null;
       if (state.streetOverlayOn) await _reloadStreetOverlay();
 
       if (!state.lots.length) {
@@ -158,6 +157,9 @@ const App = (() => {
     MapManager.plotMarkers(filtered, _onSelectLot, _onDirectionsByLotId);
     UI.updateHeaderStats(state.lots);
     UI.updateCityStats(state.lots);
+    requestAnimationFrame(() => {
+      if (typeof MapManager.resizeMap === 'function') MapManager.resizeMap();
+    });
   }
 
   function _getFiltered() {
@@ -165,7 +167,8 @@ const App = (() => {
       switch (state.filterType) {
         case 'free':        return lot.fee === 'no';
         case 'favourites':  return lot.isFavourite;
-        case 'available':   return Number.isFinite(lot.availableSpots) && lot.availableSpots > 0;
+        case 'available':   return (lot.availabilitySource === 'live' || lot.availabilitySource === 'demo')
+          && Number.isFinite(lot.availableSpots) && lot.availableSpots > 0;
         case 'multistorey': return lot.parkingType === 'multi-storey';
         case 'underground': return lot.parkingType === 'underground';
         case 'surface':     return ['surface', 'parking'].includes(lot.parkingType);
@@ -177,26 +180,20 @@ const App = (() => {
 
   function _onSelectLot(lotId) {
     state.selectedLot = lotId;
-    state.selectedSlotId = null;
 
     const lot = state.lots.find(l => l.id === lotId);
     if (!lot) return;
 
     MapManager.panTo(lot.lat, lot.lng);
 
+    if (typeof SlotReservation !== 'undefined' && SlotReservation.init) {
+      SlotReservation.init(lot);
+    }
     UI.openPanel(lot, {
       onDirections: () => _openDirectionsToLot(lot),
       onOsm:        () => { window.open(lot.osmUrl, '_blank', 'noopener,noreferrer'); },
       onClose:      _onClosePanel,
-      onSelectSlot: slotId => _onPickSlot(lot, slotId),
-      onReserve: () => _onReserveSlot(lot),
-      onNotify: () => _onNotifyWhenFree(lot),
-      onToggleFavourite: () => _onToggleFavourite(lot.id),
-      selectedSlotId: state.selectedSlotId,
     });
-    if (typeof SlotReservation !== 'undefined' && SlotReservation.init) {
-      SlotReservation.init(lot);
-    }
     if (window.innerWidth <= 820) {
       document.getElementById('map-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -214,99 +211,116 @@ const App = (() => {
 
   function _onClosePanel() {
     state.selectedLot = null;
-    state.selectedSlotId = null;
     UI.closePanel();
     _refreshView();
   }
 
-  function _prepareLotSlots(lot) {
-    const total = Number.isFinite(lot.capacity) && lot.capacity > 0
-      ? lot.capacity
-      : Utils.randInt(24, 72);
-    if (!Array.isArray(lot.slots) || lot.slots.length !== total) {
-      lot.slots = Array.from({ length: total }, (_, idx) => ({
-        id: idx + 1,
-        status: 'taken',
-      }));
+  function _getDefaultCapacity(lot) {
+    const type = lot.parkingType || (lot.tags && lot.tags.parking) || '';
+    if (type === 'multi-storey') return Math.floor(Math.random() * 150 + 60);
+    if (type === 'underground') return Math.floor(Math.random() * 80 + 30);
+    return Math.floor(Math.random() * 40 + 10);
+  }
+
+  /**
+   * Build per-bay rows for the grid (demo). When OCCUPANCY_API_URL returns live counts,
+   * _syncSlotsToAvailability realigns slot statuses to match API free total.
+   */
+  function _generateSlots(lot) {
+    const tags = lot.tags || {};
+    const capStr = tags.capacity != null ? String(tags.capacity).trim() : '';
+    const capMatch = capStr ? capStr.match(/\d+/) : null;
+    const capParsed = capMatch ? parseInt(capMatch[0], 10) : NaN;
+    let capacity = Number.isFinite(capParsed) && capParsed > 0
+      ? capParsed
+      : _getDefaultCapacity(lot);
+
+    capacity = Math.max(1, Math.min(capacity, 60));
+
+    const feeTag = tags.fee;
+    const freeRate = feeTag === 'no' ? 0.55 : 0.40;
+
+    lot.slots = [];
+    for (let i = 1; i <= capacity; i++) {
+      const r = Math.random();
+      let status;
+      if (r < freeRate) status = 'free';
+      else if (r < 0.75) status = 'taken';
+      else status = 'reserved';
+      const slotObj = { id: i, status };
+      if (status === 'taken' || status === 'reserved') {
+        slotObj.freeAfterMinutes = Utils.randInt(20, 25);
+      }
+      lot.slots.push(slotObj);
     }
+    lot.freeCount = lot.slots.filter(s => s.status === 'free').length;
+    lot.capacity = capacity;
+    lot.capacityKnown = Number.isFinite(capParsed) && capParsed > 0;
+    return lot;
+  }
+
+  function _prepareLotSlots(lot) {
+    _generateSlots(lot);
+
+    if (lot.availabilitySource === 'live' && Number.isFinite(lot.availableSpots)) {
+      _syncSlotsToAvailability(lot);
+      return;
+    }
+
+    lot.availableSpots = lot.freeCount;
+    lot.availabilitySource = 'demo';
     _syncSlotsToAvailability(lot);
   }
 
   function _syncSlotsToAvailability(lot) {
     if (!Array.isArray(lot.slots) || !lot.slots.length) return;
     const total = lot.slots.length;
-    const reserved = Math.max(0, Math.round(total * 0.08));
-    const booked = Math.max(0, Math.round(total * 0.05));
-    const maxFree = Math.max(0, total - reserved - booked);
-    const free = Number.isFinite(lot.availableSpots)
-      ? Utils.clamp(lot.availableSpots, 0, maxFree)
-      : Math.round(maxFree * 0.25);
-    const taken = Math.max(0, total - reserved - booked - free);
 
-    const bucket = [];
-    for (let i = 0; i < free; i++) bucket.push('free');
-    for (let i = 0; i < taken; i++) bucket.push('taken');
-    for (let i = 0; i < reserved; i++) bucket.push('reserved');
-    for (let i = 0; i < booked; i++) bucket.push('booked');
-
-    for (let i = bucket.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = bucket[i];
-      bucket[i] = bucket[j];
-      bucket[j] = tmp;
-    }
-
-    lot.slots.forEach((slot, idx) => {
+    lot.slots.forEach(slot => {
       const bookingKey = `${lot.id}:${slot.id}`;
       if (state.bookings[bookingKey]) {
         slot.status = 'booked';
-      } else {
-        slot.status = bucket[idx] || 'taken';
+        delete slot.freeAfterMinutes;
       }
     });
-  }
 
-  function _onPickSlot(lot, slotId) {
-    const slot = lot.slots.find(s => s.id === slotId);
-    if (!slot || slot.status !== 'free') return;
-    state.selectedSlotId = slotId;
-    UI.openPanel(lot, {
-      onDirections: () => _openDirectionsToLot(lot),
-      onOsm:        () => { window.open(lot.osmUrl, '_blank', 'noopener,noreferrer'); },
-      onClose:      _onClosePanel,
-      onSelectSlot: id => _onPickSlot(lot, id),
-      onReserve: () => _onReserveSlot(lot),
-      onNotify: () => _onNotifyWhenFree(lot),
-      onToggleFavourite: () => _onToggleFavourite(lot.id),
-      selectedSlotId: state.selectedSlotId,
-    });
-  }
+    const bookedCount = lot.slots.filter(s => s.status === 'booked').length;
 
-  function _onReserveSlot(lot) {
-    if (!state.selectedSlotId) {
-      UI.toast('Pick a slot', 'Select a free slot before reserving.', true);
-      return;
-    }
-    const slot = lot.slots.find(s => s.id === state.selectedSlotId);
-    if (!slot || slot.status !== 'free') {
-      UI.toast('Slot unavailable', 'Choose another free slot.', true);
-      return;
-    }
+    if (lot.availabilitySource === 'live' && Number.isFinite(lot.availableSpots)) {
+      let freeCount = Utils.clamp(lot.availableSpots, 0, total - bookedCount);
+      freeCount = Math.max(0, freeCount);
+      const restCount = Math.max(0, total - bookedCount - freeCount);
 
-    UI.openReserveModal(lot, slot, ({ plate }) => {
-      const key = `${lot.id}:${slot.id}`;
-      state.bookings[key] = {
-        plate,
-        ts: Date.now(),
-      };
-      slot.status = 'booked';
-      if (Number.isFinite(lot.availableSpots)) {
-        lot.availableSpots = Math.max(0, lot.availableSpots - 1);
+      const bucket = [];
+      for (let i = 0; i < freeCount; i++) bucket.push('free');
+      for (let i = 0; i < restCount; i++) bucket.push('taken');
+
+      for (let i = bucket.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = bucket[i];
+        bucket[i] = bucket[j];
+        bucket[j] = tmp;
       }
-      state.selectedSlotId = null;
-      UI.toast('Reservation confirmed', `${lot.name} · Slot ${slot.id} · ${plate}`, false);
-      _refreshView();
-      _onSelectLot(lot.id);
+
+      let bi = 0;
+      lot.slots.forEach(slot => {
+        if (slot.status === 'booked') return;
+        slot.status = bucket[bi++] || 'taken';
+        if (slot.status === 'free') {
+          delete slot.freeAfterMinutes;
+        } else {
+          slot.freeAfterMinutes = Utils.randInt(20, 25);
+        }
+      });
+      return;
+    }
+
+    if (lot.availabilitySource === 'demo') {
+      return;
+    }
+
+    lot.slots.forEach(slot => {
+      if (slot.status !== 'booked') slot.status = 'unknown';
     });
   }
 
@@ -322,6 +336,7 @@ const App = (() => {
       const lng = pos.coords.longitude;
       state.center = { lat, lng, label: 'My location' };
       document.getElementById('search-input').value = 'Near me';
+      MapManager.setUserLocationMarker(lat, lng);
       MapManager.panTo(lat, lng);
       MapManager.drawRadius(lat, lng, state.radius);
       const elements = await API.fetchParking(lat, lng, state.radius);
@@ -339,41 +354,9 @@ const App = (() => {
     }
   }
 
-  function _startLiveSimulation() {
+  function _clearLiveSimulation() {
     if (state.simTimer) clearInterval(state.simTimer);
-    state.simTimer = setInterval(() => {
-      if (!state.lots.length) return;
-      state.lots.forEach(lot => {
-        if (!Number.isFinite(lot.availableSpots)) return;
-        const delta = Utils.randInt(-2, 2);
-        lot.availableSpots = Math.max(0, lot.availableSpots + delta);
-        if (lot.availabilitySource !== 'live') {
-          lot.availabilitySource = 'simulated';
-        }
-        _syncSlotsToAvailability(lot);
-        _checkNotifyWatch(lot);
-      });
-
-      if (state.selectedLot != null) {
-        const lot = state.lots.find(l => l.id === state.selectedLot);
-        if (lot) {
-          UI.openPanel(lot, {
-            onDirections: () => _openDirectionsToLot(lot),
-            onOsm:        () => { window.open(lot.osmUrl, '_blank', 'noopener,noreferrer'); },
-            onClose:      _onClosePanel,
-            onSelectSlot: id => _onPickSlot(lot, id),
-            onReserve: () => _onReserveSlot(lot),
-            onNotify: () => _onNotifyWhenFree(lot),
-            onToggleFavourite: () => _onToggleFavourite(lot.id),
-            selectedSlotId: state.selectedSlotId,
-          });
-          if (typeof SlotReservation !== 'undefined' && SlotReservation.refresh) {
-            SlotReservation.refresh();
-          }
-        }
-      }
-      _refreshView();
-    }, 15000);
+    state.simTimer = null;
   }
 
   function _onToggleFavourite(lotId) {
@@ -482,11 +465,29 @@ const App = (() => {
       duration: detail.duration || 2,
       ref: detail.ref || '',
       ts: Date.now(),
+      paymentMethod: detail.paymentMethod || '',
+      fee: detail.fee != null ? detail.fee : lot.fee,
     };
     if (Number.isFinite(lot.availableSpots)) {
       lot.availableSpots = Math.max(0, lot.availableSpots - 1);
     }
     UI.toast('Reservation confirmed', `${lot.name} · Slot ${detail.slotId} · ${detail.plate}`, false);
+    _refreshView();
+  }
+
+  function _onBookingCancelled(e) {
+    const d = e?.detail;
+    if (!d || d.lotId == null || !Array.isArray(d.slotIds)) return;
+    const lot = state.lots.find(l => String(l.id) === String(d.lotId));
+    d.slotIds.forEach(slotId => {
+      const key = `${d.lotId}:${slotId}`;
+      delete state.bookings[key];
+      const slot = lot?.slots?.find(s => String(s.id) === String(slotId));
+      if (slot && slot.status === 'booked') slot.status = 'free';
+    });
+    if (lot && Number.isFinite(lot.availableSpots)) {
+      lot.availableSpots = Math.min(lot.slots.length, lot.availableSpots + d.slotIds.length);
+    }
     _refreshView();
   }
 
@@ -500,6 +501,7 @@ const App = (() => {
     try {
       const pos = await _getCurrentLocation();
       state.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      MapManager.setUserLocationMarker(state.userLocation.lat, state.userLocation.lng);
       MapManager.openDirections(
         lot.lat,
         lot.lng,

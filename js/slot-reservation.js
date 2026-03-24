@@ -4,9 +4,17 @@ const SlotReservation = (() => {
   let _lot = null;
   let _selectedSlots = new Set();
   let _bookedSlots = {};
+  let _lastBooking = null;
   let _toastTimer = null;
 
   const $ = id => document.getElementById(id);
+
+  const _PAYMENT_LABELS = {
+    card: 'Credit / debit card',
+    apple: 'Apple Pay',
+    google: 'Google Pay',
+    mobile: 'Pay at kiosk or app',
+  };
 
   function init(lot) {
     _lot = lot;
@@ -14,7 +22,14 @@ const SlotReservation = (() => {
     _renderGrid();
     _setReserveBtn(false);
     const card = $('booking-card');
-    if (card) card.classList.remove('show');
+    if (card) {
+      if (_lastBooking && String(_lastBooking.lotId) === String(lot.id)) {
+        _showBookingCard(_lastBooking);
+        card.classList.add('show');
+      } else {
+        card.classList.remove('show');
+      }
+    }
   }
 
   function refresh() {
@@ -27,13 +42,34 @@ const SlotReservation = (() => {
     if (!grid || !_lot || !Array.isArray(_lot.slots)) return;
     const booked = _bookedSlots[_lot.id] || [];
 
+    if (_lot.slots.length === 0) {
+      grid.innerHTML = `
+        <div class="slots-empty-msg">
+          No slots were generated for this lot. Try searching again or pick another lot.
+        </div>`;
+      return;
+    }
+
     grid.innerHTML = _lot.slots.map(slot => {
       const isBooked = booked.includes(slot.id) || slot.status === 'booked';
       const isSelected = _selectedSlots.has(slot.id);
       const cls = isBooked ? 'booked' : isSelected ? 'selected' : slot.status;
       const clickable = (slot.status === 'free' || isSelected) && !isBooked;
-      const inner = isBooked ? '' : slot.status === 'taken' ? '🚗' : String(slot.id);
-      return `<div class="ps-slot ${cls}" data-id="${slot.id}" ${clickable ? 'role="button" tabindex="0"' : ''}>${inner}</div>`;
+      const soon =
+        !isBooked &&
+        (slot.status === 'taken' || slot.status === 'reserved') &&
+        Number.isFinite(slot.freeAfterMinutes);
+      let inner = String(slot.id);
+      if (isBooked) inner = '';
+      else if (slot.status === 'taken') inner = '🚗';
+      if (soon) {
+        inner += '<span class="ps-slot-eta" aria-hidden="true">⏱</span>';
+      }
+      const title = soon
+        ? `Slot #${slot.id}: may be free in ~${slot.freeAfterMinutes} min (estimate)`
+        : '';
+      const soonClass = soon ? ' ps-slot-soon' : '';
+      return `<div class="ps-slot ${cls}${soonClass}" data-id="${slot.id}" ${title ? `title="${title}"` : ''} ${clickable ? 'role="button" tabindex="0"' : ''}>${inner}</div>`;
     }).join('');
 
     grid.querySelectorAll('.ps-slot[role="button"]').forEach(el => {
@@ -42,6 +78,30 @@ const SlotReservation = (() => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           _onSlotClick(Number(el.dataset.id));
+        }
+      });
+    });
+
+    grid.querySelectorAll('.ps-slot-soon').forEach(el => {
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = Number(el.dataset.id);
+        const slot = _lot.slots.find(s => s.id === id);
+        if (slot && Number.isFinite(slot.freeAfterMinutes)) {
+          _toast(
+            'Expected availability',
+            `Slot #${id} may be free in ~${slot.freeAfterMinutes} min (estimate).`,
+            false
+          );
+        }
+      });
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          el.click();
         }
       });
     });
@@ -87,6 +147,14 @@ const SlotReservation = (() => {
     $('ps-name').value = '';
     $('ps-duration').value = '2';
     $('ps-plate').classList.remove('error');
+    const payWrap = $('ps-payment-wrap');
+    const paySel = $('ps-payment-method');
+    const paid = _lot.fee === 'yes';
+    if (payWrap) payWrap.hidden = !paid;
+    if (paySel) {
+      paySel.value = '';
+      paySel.classList.remove('error');
+    }
     $('ps-modal-overlay').classList.add('open');
     setTimeout(() => $('ps-plate').focus(), 120);
   }
@@ -106,6 +174,18 @@ const SlotReservation = (() => {
       return;
     }
 
+    let paymentMethod = '';
+    const payEl = $('ps-payment-method');
+    if (_lot.fee === 'yes') {
+      paymentMethod = payEl ? String(payEl.value || '').trim() : '';
+      if (!paymentMethod) {
+        if (payEl) payEl.classList.add('error');
+        _toast('Payment method', 'Select how you will pay for this paid lot.', true);
+        return;
+      }
+      if (payEl) payEl.classList.remove('error');
+    }
+
     const selectedList = Array.from(_selectedSlots).sort((a, b) => a - b);
     const nowUnavailable = selectedList.filter(id => {
       const slot = _lot.slots.find(s => s.id === id);
@@ -123,17 +203,31 @@ const SlotReservation = (() => {
     if (!_bookedSlots[_lot.id]) _bookedSlots[_lot.id] = [];
     selectedList.forEach(id => {
       const slot = _lot.slots.find(s => s.id === id);
-      if (slot) slot.status = 'booked';
+      if (slot) {
+        slot.status = 'booked';
+        delete slot.freeAfterMinutes;
+      }
       _bookedSlots[_lot.id].push(id);
     });
 
     const ref = _genRef();
     const slotIds = selectedList.slice();
+    const fee = _lot.fee;
     _selectedSlots = new Set();
     _closeModal();
     _renderGrid();
     _setReserveBtn(false);
-    _showBookingCard({ slotIds, plate, name, duration, ref });
+    _lastBooking = {
+      lotId: _lot.id,
+      slotIds,
+      plate,
+      name,
+      duration,
+      ref,
+      paymentMethod,
+      fee,
+    };
+    _showBookingCard(_lastBooking);
     _toast(
       'Booking Confirmed',
       `${slotIds.length} slot${slotIds.length > 1 ? 's' : ''} · ${plate} · Ref: ${ref}`,
@@ -142,25 +236,58 @@ const SlotReservation = (() => {
 
     slotIds.forEach(slotId => {
       document.dispatchEvent(new CustomEvent('ps:booked', {
-        detail: { lotId: _lot.id, slotId, plate, name, duration, ref },
+        detail: {
+          lotId: _lot.id,
+          slotId,
+          plate,
+          name,
+          duration,
+          ref,
+          paymentMethod,
+          fee,
+        },
       }));
     });
   }
 
-  function _showBookingCard({ slotIds, plate, name, duration, ref }) {
+  function _showBookingCard({ slotIds, plate, name, duration, ref, paymentMethod, fee }) {
     const card = $('booking-card');
     const refEl = $('booking-ref');
     if (!card || !refEl) return;
     const slotLabel = slotIds.length === 1
       ? `#${slotIds[0]}`
       : slotIds.map(id => `#${id}`).join(', ');
+    const payLine =
+      fee === 'yes' && paymentMethod
+        ? `<span><b>Payment</b> ${_PAYMENT_LABELS[paymentMethod] || paymentMethod}</span>`
+        : '';
     refEl.innerHTML = `
       <span><b>Booking Ref</b> ${ref}</span>
       <span><b>Slot${slotIds.length > 1 ? 's' : ''}</b> ${slotLabel}</span>
       <span><b>Plate</b> ${plate}</span>
       ${name ? `<span><b>Name</b> ${name}</span>` : ''}
-      <span><b>Duration</b> ${duration}h</span>`;
+      <span><b>Duration</b> ${duration}h</span>
+      ${payLine}`;
     card.classList.add('show');
+  }
+
+  function _cancelBooking() {
+    if (!_lastBooking || !_lot) return;
+    if (String(_lastBooking.lotId) !== String(_lot.id)) return;
+    const { lotId, slotIds } = _lastBooking;
+    slotIds.forEach(id => {
+      const slot = _lot.slots.find(s => s.id === id);
+      if (slot && slot.status === 'booked') slot.status = 'free';
+    });
+    const arr = _bookedSlots[_lot.id] || [];
+    const setIds = new Set(slotIds.map(Number));
+    _bookedSlots[_lot.id] = arr.filter(sid => !setIds.has(Number(sid)));
+    if (_bookedSlots[_lot.id].length === 0) delete _bookedSlots[_lot.id];
+    _lastBooking = null;
+    $('booking-card')?.classList.remove('show');
+    _renderGrid();
+    document.dispatchEvent(new CustomEvent('ps:cancelled', { detail: { lotId, slotIds } }));
+    _toast('Booking cancelled', 'Your slot reservation was released.', false);
   }
 
   function _setReserveBtn(enabled) {
@@ -216,6 +343,7 @@ const SlotReservation = (() => {
       $('ps-duration').value = String(h);
       _setDurChip(h);
     });
+    $('btn-cancel-booking')?.addEventListener('click', _cancelBooking);
   }
 
   if (document.readyState === 'loading') {

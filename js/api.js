@@ -163,7 +163,7 @@ const API = (() => {
   }
 
   /* ────────────────────────────────────────────
-     PARSE — OSM elements → lot objects (no fake slots)
+     PARSE — OSM elements → lot objects (capacity from tags only)
   ──────────────────────────────────────────── */
 
   function parseLots(elements, searchLat, searchLng) {
@@ -253,15 +253,15 @@ const API = (() => {
             lot.availabilitySource = 'live';
             return;
           }
-          _applyEstimatedAvailability(lot);
+          _applyUnknownAvailability(lot);
         });
         return lots;
       } catch (_) {
-        // Gracefully fall back to local estimate when live feed fails.
+        // Fall back: no invented counts when the feed fails.
       }
     }
 
-    lots.forEach(_applyEstimatedAvailability);
+    lots.forEach(_applyUnknownAvailability);
     return lots;
   }
 
@@ -285,20 +285,13 @@ const API = (() => {
     return data && typeof data === 'object' ? data : {};
   }
 
-  function _applyEstimatedAvailability(lot) {
-    if (!lot.capacityKnown) {
-      lot.availableSpots = null;
-      lot.availabilitySource = 'unknown';
-      return;
-    }
-
-    const baseRate = lot.fee === 'no' ? 0.32 : lot.fee === 'yes' ? 0.18 : 0.22;
-    const hour = new Date().getHours();
-    const peakPenalty = (hour >= 8 && hour <= 10) || (hour >= 16 && hour <= 19) ? 0.08 : 0;
-    const rate = Math.max(0.05, baseRate - peakPenalty);
-
-    lot.availableSpots = Math.max(0, Math.round(lot.capacity * rate));
-    lot.availabilitySource = 'simulated';
+  /**
+   * OpenStreetMap does not publish live per-bay occupancy. Without your own
+   * OCCUPANCY_API_URL we keep counts empty so the UI does not invent “free” spots.
+   */
+  function _applyUnknownAvailability(lot) {
+    lot.availableSpots = null;
+    lot.availabilitySource = 'unknown';
   }
 
   return { geocode, fetchParking, fetchStreetParking, parseLots, parseStreetParking, enrichAvailability };

@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
    ui.js — DOM rendering & UI interactions
-   Shows only verifiable OpenStreetMap data (no simulated occupancy).
+   OSM tags + optional OCCUPANCY_API_URL for live free counts.
 ═══════════════════════════════════════════════════════ */
 
 'use strict';
@@ -21,9 +21,9 @@ const UI = (() => {
 
   function updateHeaderStats(lots) {
     const total = lots.length;
-    const withCap = lots.reduce((sum, l) => sum + (Number.isFinite(l.availableSpots) ? Math.max(0, l.availableSpots) : 0), 0);
+    const withCapTag = lots.filter(l => l.capacityKnown).length;
     document.getElementById('hdr-lots').textContent   = total.toLocaleString();
-    document.getElementById('hdr-cap-tagged').textContent = withCap.toLocaleString();
+    document.getElementById('hdr-cap-tagged').textContent = withCapTag.toLocaleString();
   }
 
   function showLoading() {
@@ -78,10 +78,11 @@ const UI = (() => {
       const typeIco    = Utils.typeIcon(lot.parkingType);
       const distStr    = Utils.formatDist(lot.dist);
       const isActive   = lot.id === activeLotId;
-      const approxPrefix = (lot.availabilitySource === 'estimated' || lot.availabilitySource === 'simulated') ? '~' : '';
-      const availLine = Number.isFinite(lot.availableSpots)
-        ? `🟢 ${approxPrefix}${lot.availableSpots} spots available <span class="lc-tag-src">(${lot.availabilitySource})</span>`
-        : `🟡 Availability <span class="lc-tag-src">unknown</span>`;
+      const availLine = lot.availabilitySource === 'live' && Number.isFinite(lot.availableSpots)
+        ? `🟢 ${lot.availableSpots} free (live) <span class="lc-tag-src">(API)</span>`
+        : lot.availabilitySource === 'demo' && Number.isFinite(lot.availableSpots)
+          ? `🟢 ~${lot.availableSpots} free spots <span class="lc-tag-src">(demo)</span>`
+          : `⚪ No estimate <span class="lc-tag-src">(run search)</span>`;
       const nameSafe   = Utils.escapeHtml(lot.name);
       const favClass = lot.isFavourite ? 'on' : '';
 
@@ -103,7 +104,7 @@ const UI = (() => {
             ${lot.openingHours ? `<span>🕐 ${Utils.escapeHtml(lot.openingHours)}</span>` : ''}
             ${lot.disabledSpaces > 0 ? `<span>♿ ${lot.disabledSpaces}</span>` : ''}
           </div>
-          <div class="avail-bar" title="Colour reflects fee tag in OSM, not live occupancy">
+          <div class="avail-bar" title="Pin colour reflects live API counts when configured; otherwise neutral">
             <div class="avail-fill" style="width:${barPct * 100}%;background:${fillColor}"></div>
           </div>
         </div>`;
@@ -149,33 +150,19 @@ const UI = (() => {
   }
 
   /**
-   * @param {Object} lot
-   * @param {Object} callbacks { onDirections, onOsm, onClose }
+   * Single renderer for #slots-grid — SlotReservation owns the grid (ps-slot cells).
+   * Call SlotReservation.init(lot) before openPanel so refresh() has a lot context.
    */
-  function _renderSlots(lot, selectedSlotId, onSelectSlot) {
+  function _renderSlots(lot) {
     const slotsEl = document.getElementById('slots-grid');
     if (!slotsEl) return;
     if (!Array.isArray(lot.slots) || !lot.slots.length) {
       slotsEl.innerHTML = '<div class="state-box">No slot map available for this lot.</div>';
       return;
     }
-    slotsEl.innerHTML = lot.slots.map(slot => {
-      const isChosen = selectedSlotId === slot.id;
-      return `<button type="button" class="slt ${slot.status}${isChosen ? ' chosen' : ''}" data-slot-id="${slot.id}" data-slot-status="${slot.status}" ${slot.status !== 'free' ? 'disabled' : ''}>${slot.id}</button>`;
-    }).join('');
-    slotsEl.onclick = e => {
-      const btn = e.target.closest('.slt');
-      if (!btn) return;
-      const slotId = Number(btn.dataset.slotId);
-      const status = btn.dataset.slotStatus;
-      if (!Number.isFinite(slotId)) return;
-      if (status !== 'free') {
-        toast('Slot unavailable', 'Please choose a green free slot.', true);
-        return;
-      }
-      onSelectSlot(slotId);
-      toast('Slot selected', `Slot ${slotId} selected. Tap Reserve Slot to continue.`, false);
-    };
+    if (typeof SlotReservation !== 'undefined' && SlotReservation.refresh) {
+      SlotReservation.refresh();
+    }
   }
 
   function openPanel(lot, callbacks) {
@@ -184,19 +171,43 @@ const UI = (() => {
       `${lot.parkingType.replace(/-/g, ' ')} · OpenStreetMap · ${lot.osmType}/${lot.osmRef}`;
 
     document.getElementById('mp-capacity').textContent =
-      Number.isFinite(lot.availableSpots)
-        ? `${(lot.availabilitySource === 'estimated' || lot.availabilitySource === 'simulated') ? '~' : ''}${lot.availableSpots}`
+      (lot.availabilitySource === 'live' || lot.availabilitySource === 'demo') && Number.isFinite(lot.availableSpots)
+        ? String(lot.availableSpots)
         : '—';
+    const capLab = document.getElementById('mp-capacity-label');
+    if (capLab) {
+      capLab.textContent = lot.availabilitySource === 'live'
+        ? 'Free bays (live API)'
+        : lot.availabilitySource === 'demo'
+          ? 'Free bays (demo estimate)'
+          : 'Free bays (not live — set API)';
+    }
     document.getElementById('mp-fee').textContent       = Utils.feeLabel(lot.fee);
     document.getElementById('mp-type').textContent =
       lot.parkingType === 'multi-storey' ? '🏢 Multi'  :
       lot.parkingType === 'underground'  ? '⬇ Under'   : '🅿 Surface';
     const disclaimer = document.getElementById('mp-disclaimer');
-    disclaimer.innerHTML = lot.availabilitySource === 'live'
-      ? 'Availability comes from your connected occupancy API. Confirm on site before parking.'
-      : lot.availabilitySource === 'simulated'
-        ? 'Live occupancy is currently simulated for demo use. Confirm availability on arrival.'
-        : 'Availability is estimated from mapped capacity and lot attributes.';
+    const capNote = lot.capacityKnown
+      ? ` OpenStreetMap capacity tag: <strong>${lot.capacity}</strong> bays (grid capped at 60).`
+      : ` Estimated <strong>${lot.capacity}</strong> bays for the demo grid (no capacity tag in OSM).`;
+    if (lot.availabilitySource === 'live') {
+      disclaimer.innerHTML = `Counts come from your <strong>OCCUPANCY_API_URL</strong> integration. Confirm on site before parking.${capNote}`;
+    } else if (lot.availabilitySource === 'demo') {
+      disclaimer.innerHTML = `Bay states are <strong>simulated</strong> for this demo — not live sensor data. Confirm on site.${capNote}`;
+    } else {
+      disclaimer.innerHTML = `Set <strong>CONFIG.OCCUPANCY_API_URL</strong> in <code>js/config.js</code> for live free counts, or use the demo estimate after search.${capNote}`;
+    }
+
+    const srcBadge = document.getElementById('slot-source-badge');
+    const srcLabel = document.getElementById('slot-source-label');
+    if (srcBadge && srcLabel) {
+      srcBadge.classList.toggle('live-on', lot.availabilitySource === 'live' || lot.availabilitySource === 'demo');
+      srcLabel.textContent = lot.availabilitySource === 'live'
+        ? 'Live API'
+        : lot.availabilitySource === 'demo'
+          ? 'Demo slots'
+          : 'OSM only';
+    }
 
     const detailsEl = document.getElementById('mp-details');
     detailsEl.innerHTML = [
@@ -219,48 +230,7 @@ const UI = (() => {
     document.getElementById('dir-btn').onclick  = callbacks.onDirections;
     document.getElementById('osm-btn').onclick  = callbacks.onOsm;
     document.getElementById('mp-close').onclick = callbacks.onClose;
-    _renderSlots(lot, callbacks.selectedSlotId, callbacks.onSelectSlot);
-
-    const reserveBtnId = 'reserve-btn';
-    const actions = document.querySelector('.mp-actions');
-    if (actions && !document.getElementById(reserveBtnId)) {
-      const reserveBtn = document.createElement('button');
-      reserveBtn.id = reserveBtnId;
-      reserveBtn.className = 'btn btn-p';
-      reserveBtn.textContent = 'Reserve Slot';
-      actions.prepend(reserveBtn);
-    }
-    const reserveBtn = document.getElementById(reserveBtnId);
-    if (reserveBtn) {
-      reserveBtn.textContent = callbacks.selectedSlotId
-        ? `Reserve Slot #${callbacks.selectedSlotId}`
-        : 'Reserve Slot';
-      reserveBtn.onclick = callbacks.onReserve;
-    }
-
-    const notifyBtnId = 'notify-btn';
-    if (actions && !document.getElementById(notifyBtnId)) {
-      const notifyBtn = document.createElement('button');
-      notifyBtn.id = notifyBtnId;
-      notifyBtn.className = 'btn btn-s';
-      notifyBtn.textContent = 'Notify When Free';
-      actions.appendChild(notifyBtn);
-    }
-    const notifyBtn = document.getElementById(notifyBtnId);
-    if (notifyBtn) notifyBtn.onclick = callbacks.onNotify;
-
-    const favBtnId = 'fav-panel-btn';
-    if (actions && !document.getElementById(favBtnId)) {
-      const favBtn = document.createElement('button');
-      favBtn.id = favBtnId;
-      favBtn.className = 'btn btn-s';
-      actions.appendChild(favBtn);
-    }
-    const favBtn = document.getElementById(favBtnId);
-    if (favBtn) {
-      favBtn.textContent = lot.isFavourite ? '★ Favourited' : '☆ Save Lot';
-      favBtn.onclick = callbacks.onToggleFavourite;
-    }
+    _renderSlots(lot);
 
     document.getElementById('map-panel').classList.add('open');
   }
@@ -275,12 +245,14 @@ const UI = (() => {
 
   function updateCityStats(lots) {
     const total = lots.length;
+    const hasNumbers = lots.some(l =>
+      (l.availabilitySource === 'live' || l.availabilitySource === 'demo') && Number.isFinite(l.availableSpots));
     const free = lots.reduce((sum, lot) => sum + (Number.isFinite(lot.availableSpots) ? Math.max(0, lot.availableSpots) : 0), 0);
     const cap = lots.reduce((sum, lot) => sum + (Number.isFinite(lot.capacity) ? lot.capacity : 0), 0);
-    const fillPct = cap > 0 ? Math.round(((cap - free) / cap) * 100) : 0;
+    const fillPct = cap > 0 && hasNumbers ? Math.round(((cap - free) / cap) * 100) : null;
     document.getElementById('ss-total').textContent = String(total);
-    document.getElementById('ss-free').textContent = String(free);
-    document.getElementById('ss-fill').textContent = `${Utils.clamp(fillPct, 0, 100)}%`;
+    document.getElementById('ss-free').textContent = hasNumbers ? String(free) : '—';
+    document.getElementById('ss-fill').textContent = fillPct != null ? `${Utils.clamp(fillPct, 0, 100)}%` : '—';
   }
 
   function renderRecentSearches(items, onPick) {

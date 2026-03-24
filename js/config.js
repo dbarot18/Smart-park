@@ -42,9 +42,17 @@ const CONFIG = {
   MAPBOX_STYLE: 'mapbox://styles/mapbox/dark-v11',
 
   /**
-   * Future: HTTP endpoint that returns live occupancy keyed by OSM id, e.g.
-   * { "way/12345": { "available": 12, "total": 40 } }
-   * Leave empty — the UI only shows OSM tags until you plug in a real API + backend.
+   * Fastest real data without hardware: use your city’s open-data portal. Search the web for
+   * "[your city] parking API open data" — many US cities publish free parking or mobility APIs.
+   * (Example region: Phoenix / Tempe — Arizona State University and the City of Tempe both
+   * publish parking-related open data; adapt your backend to map their fields to OSM ids.)
+   *
+   * Point this at an endpoint that returns lot occupancy. `api.js` `enrichAvailability()` POSTs
+   * lot metadata and expects JSON keyed by OSM id, e.g.:
+   * { "way/712721433": { "available": 12, "total": 40 } }
+   * You may need a small server to translate a city Socrata/CKAN feed into that shape.
+   *
+   * Replace with your real URL when ready. Use '' to skip live calls (demo slots only).
    */
-  OCCUPANCY_API_URL: '',
+  OCCUPANCY_API_URL: 'https://data.yourcity.gov/api/parking/occupancy',
 };

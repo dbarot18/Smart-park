@@ -60,6 +60,9 @@
 
   /* Header */
   --header-h: 62px;
+
+  /* Viewport minus header — use to align sidebar + map, cap lot list */
+  --main-h: calc(100vh - var(--header-h));
 }
 
 /* ── Reset ── */
@@ -70,12 +73,15 @@
 }
 
 html, body {
-  min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   font-family: var(--font-ui);
   background:
     radial-gradient(1200px 600px at 15% -10%, rgba(127,140,255,0.16), transparent 58%),
